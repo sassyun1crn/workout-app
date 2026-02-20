@@ -1,18 +1,162 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Workout App Test</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta name="theme-color" content="#05040a"/>
+  <title>Workout App</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
   <style>
-    body{font-family:system-ui;margin:40px;background:#05040a;color:#f5f3ff}
-    .box{padding:16px;border:1px solid #231a3a;border-radius:12px;max-width:520px}
+    :root{--bg:#05040a;--card:#0b0714;--ink:#f5f3ff;--muted:#b6b0d6;--line:#231a3a;--teal:#2dd4bf;--purple:#a78bfa;--chip:#060411;}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink);}
+    .wrap{max-width:900px;margin:0 auto;padding:16px;}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin:12px 0;}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;}
+    .pill{background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:6px 10px;color:var(--muted);font-size:.85rem;}
+    .btn{border:0;border-radius:999px;padding:10px 14px;font-weight:900;cursor:pointer;}
+    .btn.teal{background:linear-gradient(135deg,var(--teal),#14b8a6);color:#05040a;}
+    .btn.purple{background:linear-gradient(135deg,var(--purple),#7c3aed);color:#05040a;}
+    .item{display:flex;gap:10px;align-items:flex-start;background:var(--chip);border:1px solid var(--line);padding:10px;border-radius:12px;margin:8px 0;}
+    .item .name{font-weight:950}
+    .item .meta{color:var(--muted);font-size:.85rem}
+    textarea{width:100%;min-height:90px;background:#05040a;color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-weight:700;}
   </style>
 </head>
 <body>
-  <div class="box">
-    <h1>✅ It works.</h1>
-    <p>If you can see this, GitHub Pages is serving <b>index.html</b> correctly.</p>
+<div class="wrap">
+  <div class="card">
+    <div class="row">
+      <div>
+        <div class="pill" id="dayPill">Day</div>
+        <h2 style="margin:8px 0 0" id="title">Loading…</h2>
+        <div style="color:var(--muted)" id="desc"></div>
+      </div>
+      <div class="row">
+        <button class="btn purple" id="prev">◀</button>
+        <button class="btn purple" id="next">▶</button>
+      </div>
+    </div>
   </div>
+
+  <div class="card">
+    <div class="pill">Checklist</div>
+    <div id="list"></div>
+  </div>
+
+  <div class="card">
+    <div class="pill">Notes (autosaved)</div>
+    <textarea id="notes" placeholder="Back/leg, weights used, RPE, how you felt…"></textarea>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <button class="btn teal" id="installTip">iPhone install: Safari → Share → Add to Home Screen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const PROGRAM = [
+  {
+    title:"Week 1 • Day 1 (Thu) — Inflammation Reset (Combined)",
+    desc:"Steady bike + activation + light glute/core/biceps. No heavy spinal loading.",
+    items:[
+      ["Warm-up: Easy bike","5 min (RPE 2–3)"],
+      ["Cat–Cow","10 reps"],
+      ["Pelvic Tilts","15 reps"],
+      ["Clamshell (Side-lying glute raise)","15/side"],
+      ["Glute Bridge","15 reps"],
+      ["Bird Dog","8/side"],
+      ["Cardio: Steady bike","35–40 min (RPE 3–4)"],
+      ["Banded Hip Extension (Kickback)","3×15/side"],
+      ["Bodyweight RDL","3×12 (slow)"],
+      ["Deadbug","3×8/side"],
+      ["Side Plank","3×30 sec/side"],
+      ["Alt DB Curl","3×12"],
+      ["Hammer Curl","2×15"],
+      ["Cooldown: Figure-4 + hip flexor stretch","5 min + 4-in/6-out breathing"]
+    ]
+  },
+  {
+    title:"Week 1 • Day 2 (Fri) — Dual Day A",
+    desc:"AM lift (hip thrust/RDL/lunge + core + biceps). PM steady bike.",
+    items:[
+      ["AM Warm-up: Easy bike","5 min"],
+      ["Clamshell","15/side"],
+      ["Glute Bridge","15"],
+      ["Bird Dog","8/side"],
+      ["Pelvic Tilts","12"],
+      ["Barbell Hip Thrust","4×8 (moderate, 2 reps in reserve)"],
+      ["Barbell RDL (rack)","3×8 (slow)"],
+      ["Step-back DB Lunge (short stride)","3×8/side"],
+      ["Pallof Press","3×12/side"],
+      ["Barbell Curl","3×8"],
+      ["Hammer Curl","3×10"],
+      ["PM Cardio: Bike","45–60 min steady (RPE 4–5)"]
+    ]
+  }
+];
+
+const KEY="workout_app_state_v1";
+
+function load(){ try{return JSON.parse(localStorage.getItem(KEY)||"{}")}catch{return {}} }
+function save(s){ localStorage.setItem(KEY, JSON.stringify(s)); }
+
+const elTitle=document.getElementById("title");
+const elDesc=document.getElementById("desc");
+const elList=document.getElementById("list");
+const elNotes=document.getElementById("notes");
+const elPill=document.getElementById("dayPill");
+
+let state=load();
+if(typeof state.day!=="number") state.day=0;
+if(!state.checks) state.checks={};
+if(!state.notes) state.notes={};
+
+function render(){
+  const d=state.day;
+  const day=PROGRAM[d];
+  elPill.textContent = `Day ${d+1}`;
+  elTitle.textContent = day.title;
+  elDesc.textContent = day.desc;
+
+  elList.innerHTML="";
+  day.items.forEach((it,i)=>{
+    const key=`d${d}_i${i}`;
+    const checked=!!state.checks[key];
+    const div=document.createElement("div");
+    div.className="item";
+    div.innerHTML = `
+      <input type="checkbox" ${checked?"checked":""}>
+      <div>
+        <div class="name">${it[0]}</div>
+        <div class="meta">${it[1]}</div>
+      </div>`;
+    div.querySelector("input").onchange=(e)=>{
+      state.checks[key]=e.target.checked;
+      save(state);
+    };
+    elList.appendChild(div);
+  });
+
+  elNotes.value = state.notes[`d${d}`] || "";
+  elNotes.oninput=()=>{
+    state.notes[`d${d}`]=elNotes.value;
+    save(state);
+  };
+}
+
+document.getElementById("prev").onclick=()=>{ state.day=Math.max(0,state.day-1); save(state); render(); };
+document.getElementById("next").onclick=()=>{ state.day=Math.min(PROGRAM.length-1,state.day+1); save(state); render(); };
+
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("./sw.js").catch(()=>{});
+}
+
+save(state);
+render();
+</script>
 </body>
 </html>
